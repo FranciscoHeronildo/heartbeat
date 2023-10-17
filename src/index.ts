@@ -51,6 +51,31 @@ const heartBeat = async () => {
     }
   } catch (err) {
     console.log(err);
+    console.log("Server is dead");
+    if (fs.existsSync(stopFilePath)) {
+      execFile(`${stopFilePath}`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Error running the script: ${error.message}`);
+        }
+        if (stderr) {
+          console.error(`Erro script: ${stderr}`);
+        }
+        console.log(`Script: ${stdout}`);
+      });
+    }
+    if (fs.existsSync(startFilePath)) {
+      execFile(`${startFilePath}`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Error running the script: ${error.message}`);
+        }
+
+        if (stderr) {
+          console.error(`Erro script: ${stderr}`);
+        }
+
+        console.log(`Script: ${stdout}`);
+      });
+    }
   }
 };
 
