@@ -2,81 +2,118 @@ import express from "express";
 import axios from "axios";
 import * as dotenv from "dotenv";
 import * as fs from "fs";
-import { execFile } from "child_process";
+import { exec } from "child_process";
 
+// .env settings
+let isDevelopment = true;
+const envProduction = "/snapshot/.env";
+
+if (fs.existsSync(envProduction)) {
+  isDevelopment = false;
+}
+
+if (isDevelopment) {
+  dotenv.config(); // development
+} else {
+  dotenv.config({
+    path: envProduction, // production
+  });
+}
+
+// environment variables
 const portServer = process.env.PORT;
-const stopFilePath = process.env.PATH_STOP;
-const startFilePath = process.env.PATH_START;
+const urlServer = process.env.URL_SERVER;
+const cmdStop = process.env.CMD_STOP;
+const cmdStart = process.env.CMD_START;
+const bot = process.env.BOT;
+const timeBot = process.env.TIMEBOT;
 
 const app = express();
 const port = portServer;
 
+// robot time in minutes
+const time = 1000 * 60 * Number(timeBot);
+
 app.listen(port, () => {
-  console.log(`Express is listening at ${port}`);
+  console.log(`Express is listening at http://localhost:${port}`);
 });
 
-const heartBeat = async () => {
+const checkResponseSystems = async () => {
   try {
-    const response = await axios.get(`http://localhost:${port}/heartbeat`);
+    const url = urlServer;
+    const response = await axios.get(url);
 
-    if (response.status === 200) {
-      console.log("Server is alive");
+    if (response.data.status === "success" && response.data.data === "ok") {
+      console.log("System Working");
+      // robot active
+      if (bot) {
+        setTimeout(checkResponseSystems, time);
+      }
       return;
     } else {
-      console.log("Server is dead");
-      if (fs.existsSync(stopFilePath)) {
-        execFile(`${stopFilePath}`, (error, stdout, stderr) => {
-          if (error) {
-            console.error(`Error running the script: ${error.message}`);
-          }
-          if (stderr) {
-            console.error(`Erro script: ${stderr}`);
-          }
-          console.log(`Script: ${stdout}`);
-        });
-      }
-      if (fs.existsSync(startFilePath)) {
-        execFile(`${startFilePath}`, (error, stdout, stderr) => {
-          if (error) {
-            console.error(`Error running the script: ${error.message}`);
-          }
-
-          if (stderr) {
-            console.error(`Erro script: ${stderr}`);
-          }
-
-          console.log(`Script: ${stdout}`);
-        });
-      }
-    }
-  } catch (err) {
-    console.log(err);
-    console.log("Server is dead");
-    if (fs.existsSync(stopFilePath)) {
-      execFile(`${stopFilePath}`, (error, stdout, stderr) => {
+      console.log("System not Working");
+      // run shell stop command
+      exec(`${cmdStop}`, (error, stdout, stderr) => {
         if (error) {
           console.error(`Error running the script: ${error.message}`);
-        }
-        if (stderr) {
-          console.error(`Erro script: ${stderr}`);
-        }
-        console.log(`Script: ${stdout}`);
-      });
-    }
-    if (fs.existsSync(startFilePath)) {
-      execFile(`${startFilePath}`, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`Error running the script: ${error.message}`);
+          return;
         }
 
         if (stderr) {
           console.error(`Erro script: ${stderr}`);
+          return;
         }
+        console.log(`Script Stop: ${stdout}`);
+        exec(`${cmdStart}`, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Error running the script: ${error.message}`);
+            return;
+          }
 
-        console.log(`Script: ${stdout}`);
+          if (stderr) {
+            console.error(`Erro script: ${stderr}`);
+            return;
+          }
+          console.log(`Script Started: ${stdout}`);
+          // robot active
+          if (bot) {
+            setTimeout(checkResponseSystems, time);
+          }
+          return;
+        });
       });
     }
+  } catch (error) {
+    console.log("System not Working");
+    // run shell stop command
+    exec(`${cmdStop}`, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Error running the script: ${error.message}`);
+      }
+
+      if (stderr) {
+        console.error(`Erro script: ${stderr}`);
+      }
+      console.log(`Script Stop: ${stdout}`);
+      exec(`${cmdStart}`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Error running the script: ${error.message}`);
+          return;
+        }
+
+        if (stderr) {
+          console.error(`Erro script: ${stderr}`);
+          return;
+        }
+        console.log(`Script Started: ${stdout}`);
+        // robot active
+        if (bot) {
+          setTimeout(checkResponseSystems, time);
+        }
+        return;
+      });
+    });
   }
 };
 
-heartBeat();
+checkResponseSystems();
